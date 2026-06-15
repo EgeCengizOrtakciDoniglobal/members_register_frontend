@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { userStore, lastLoginStore, getMembers, logout as doLogout, ApiError, type Member } from '../api'
+import MemberFormDialog from './MemberFormDialog.vue'
 
 const router = useRouter()
+const $q = useQuasar()
 const user = userStore.get()
 
 const members = ref<Member[]>([])
@@ -11,44 +14,14 @@ const loading = ref(true)
 const errorMsg = ref('')
 const monthsRange = ref(6)
 
-/* ---------- Menü (açılır gruplar) ---------- */
+/* ---------- İkonlar (içerik) ---------- */
 const ICONS: Record<string, string> = {
-  grid: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
   users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   userplus: 'M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M20 8v6M23 11h-6',
-  chart: 'M18 20V10M12 20V4M6 20v-6',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
-  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
-  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   search: 'M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z',
   bell: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
   download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
-  mail: 'M4 4h16v16H4zM22 6l-10 7L2 6',
-}
-
-interface NavChild { title: string; active?: boolean }
-interface NavItem { id: string; title: string; icon: string; children?: NavChild[] }
-
-const menu: { section: string; items: NavItem[] }[] = [
-  {
-    section: 'ANA MENÜ',
-    items: [
-      { id: 'dash', title: 'Dashboard', icon: 'grid', children: [{ title: 'Genel Bakış', active: true }, { title: 'Analizler' }] },
-      { id: 'members', title: 'Üyeler', icon: 'users', children: [{ title: 'Tüm Üyeler' }, { title: 'Aktif Üyeler' }, { title: 'Pasif Üyeler' }, { title: 'Beklemede' }] },
-      { id: 'new', title: 'Yeni Üye', icon: 'userplus' },
-    ],
-  },
-  {
-    section: 'YÖNETİM',
-    items: [
-      { id: 'reports', title: 'Raporlar', icon: 'chart', children: [{ title: 'Aylık Rapor' }, { title: 'Durum Raporu' }] },
-      { id: 'settings', title: 'Ayarlar', icon: 'settings', children: [{ title: 'Genel' }, { title: 'Güvenlik' }] },
-    ],
-  },
-]
-const open = reactive<Record<string, boolean>>({ dash: true, members: true })
-function toggle(id: string) {
-  open[id] = !open[id]
 }
 
 /* ---------- Veri ---------- */
@@ -119,21 +92,61 @@ function statusLabel(s: Member['status']): string {
   return s === 'active' ? 'Aktif' : s === 'inactive' ? 'Pasif' : 'Beklemede'
 }
 
-const quickActions = [
-  { icon: 'userplus', label: 'Yeni Üye' },
-  { icon: 'download', label: 'Dışa Aktar' },
-  { icon: 'mail', label: 'Toplu E-posta' },
-  { icon: 'search', label: 'Üye Ara' },
-  { icon: 'chart', label: 'Rapor Al' },
-  { icon: 'settings', label: 'Ayarlar' },
+const quickActions: { icon: string; label: string; action: string }[] = [
+  { icon: 'userplus', label: 'Yeni Üye', action: 'new' },
+  { icon: 'download', label: 'Dışa Aktar', action: 'export' },
+  { icon: 'search', label: 'Üye Ara', action: 'search' },
+  { icon: 'settings', label: 'Ayarlar', action: 'settings' },
 ]
 
-function logout() {
-  doLogout()
-  router.push({ name: 'login' })
+const memberDialog = ref(false)
+
+function runAction(a: { action: string }) {
+  if (a.action === 'new') memberDialog.value = true
+  else if (a.action === 'export') exportJson()
+  else if (a.action === 'search') {
+    searchQuery.value = ''
+    searchDialog.value = true
+  } else if (a.action === 'settings') router.push({ name: 'wp-connection' })
 }
 
-onMounted(async () => {
+/* ---------- Dışa aktar (JSON) ---------- */
+function exportJson() {
+  const data = JSON.stringify(members.value, null, 2)
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `uyeler-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  $q.notify({
+    type: 'positive',
+    message: `${members.value.length} üye JSON olarak indirildi.`,
+    position: 'top',
+  })
+}
+
+/* ---------- Üye ara (modal) ---------- */
+const searchDialog = ref(false)
+const searchQuery = ref('')
+function openHeaderSearch() {
+  searchDialog.value = true
+}
+const searchResults = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return []
+  return members.value
+    .filter((m) => `${m.name} ${m.lastname} ${m.mail} ${m.tckn} ${m.lisanceno}`.toLowerCase().includes(q))
+    .slice(0, 30)
+})
+function goMember() {
+  searchDialog.value = false
+  router.push({ name: 'members' })
+}
+
+async function loadMembers() {
+  loading.value = true
   try {
     members.value = await getMembers()
   } catch (e) {
@@ -146,66 +159,22 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadMembers)
 </script>
 
 <template>
-  <div class="layout">
-    <!-- ---------- Sol menü ---------- -->
-    <aside class="sidebar">
-      <div class="brand">
-        <span class="logo-mark">M</span>
-        <div class="brand-text">
-          <span class="brand-name">Members</span>
-          <span class="brand-sub">Yönetim Paneli</span>
-        </div>
-      </div>
-
-      <nav class="nav">
-        <template v-for="grp in menu" :key="grp.section">
-          <p class="nav-section">{{ grp.section }}</p>
-          <template v-for="item in grp.items" :key="item.id">
-            <!-- Açılır grup -->
-            <template v-if="item.children">
-              <button class="nav-parent" :class="{ open: open[item.id] }" @click="toggle(item.id)">
-                <svg class="nav-ic" viewBox="0 0 24 24"><path :d="ICONS[item.icon]" /></svg>
-                <span class="nav-title">{{ item.title }}</span>
-                <svg class="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>
-              </button>
-              <div class="submenu" :class="{ open: open[item.id] }">
-                <div class="submenu-inner">
-                  <a v-for="c in item.children" :key="c.title" class="nav-child" :class="{ active: c.active }" href="#" @click.prevent>
-                    <span class="bullet" />{{ c.title }}
-                  </a>
-                </div>
-              </div>
-            </template>
-            <!-- Tekil link -->
-            <a v-else class="nav-parent solo" href="#" @click.prevent>
-              <svg class="nav-ic" viewBox="0 0 24 24"><path :d="ICONS[item.icon]" /></svg>
-              <span class="nav-title">{{ item.title }}</span>
-            </a>
-          </template>
-        </template>
-      </nav>
-
-      <button class="side-logout" @click="logout">
-        <svg class="nav-ic" viewBox="0 0 24 24"><path :d="ICONS.logout" /></svg>
-        Çıkış Yap
-      </button>
-    </aside>
-
-    <!-- ---------- Ana içerik ---------- -->
-    <div class="main">
+  <div class="dash">
       <header class="topbar">
         <div class="tb-left">
           <h1>Genel Bakış</h1>
           <p class="crumb">Dashboard <span>›</span> Genel Bakış</p>
         </div>
         <div class="tb-right">
-          <div class="searchbox">
+          <div class="searchbox" @click="openHeaderSearch">
             <svg viewBox="0 0 24 24"><path :d="ICONS.search" /></svg>
-            <input type="text" placeholder="Üye ara…" />
+            <input type="text" placeholder="Üye ara…" v-model="searchQuery" @focus="openHeaderSearch" @keyup.enter="openHeaderSearch" />
           </div>
           <button class="icon-btn" aria-label="Bildirimler">
             <svg viewBox="0 0 24 24"><path :d="ICONS.bell" /></svg>
@@ -311,7 +280,7 @@ onMounted(async () => {
           <div class="panel">
             <div class="panel-head">
               <h2>Son Eklenen Üyeler</h2>
-              <a class="link" href="#" @click.prevent>Tümünü gör</a>
+              <a class="link" href="#" @click.prevent="router.push({ name: 'members' })">Tümünü gör</a>
             </div>
             <div v-if="loading" class="empty">Yükleniyor…</div>
             <div v-else-if="!recent.length" class="empty">Henüz üye yok.</div>
@@ -337,7 +306,7 @@ onMounted(async () => {
           <div class="panel">
             <div class="panel-head"><h2>Hızlı İşlemler</h2></div>
             <div class="actions">
-              <button v-for="a in quickActions" :key="a.label" class="action">
+              <button v-for="a in quickActions" :key="a.label" class="action" @click="runAction(a)">
                 <span class="action-ic"><svg viewBox="0 0 24 24"><path :d="ICONS[a.icon]" /></svg></span>
                 {{ a.label }}
               </button>
@@ -345,12 +314,55 @@ onMounted(async () => {
           </div>
         </section>
       </main>
-    </div>
+
+    <!-- Üye ara modalı -->
+    <q-dialog v-model="searchDialog">
+      <q-card class="search-card">
+        <q-card-section class="search-head">
+          <div class="text-h6">Üye Ara</div>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section class="search-row">
+          <q-input
+            v-model="searchQuery"
+            dense
+            outlined
+            autofocus
+            placeholder="Ad, soyad, e-posta, TCKN, lisans no…"
+            class="search-field"
+          >
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+          <q-btn unelevated color="primary" icon="search" label="Ara" no-caps />
+        </q-card-section>
+        <q-card-section class="search-results">
+          <div v-if="!searchQuery.trim()" class="search-hint">Aramak için yazmaya başlayın.</div>
+          <div v-else-if="!searchResults.length" class="search-hint">Sonuç bulunamadı.</div>
+          <q-list v-else separator>
+            <q-item v-for="m in searchResults" :key="m.id" clickable @click="goMember">
+              <q-item-section avatar>
+                <div class="res-avatar">{{ m.name.charAt(0).toUpperCase() }}</div>
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ m.name }} {{ m.lastname }}</q-item-label>
+                <q-item-label caption>{{ m.mail }}</q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <span class="badge" :class="'b-' + m.status">{{ statusLabel(m.status) }}</span>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <!-- Yeni üye modalı (hızlı işlemler) -->
+    <MemberFormDialog v-model="memberDialog" @saved="loadMembers" />
   </div>
 </template>
 
 <style scoped>
-.layout {
+.dash {
   --brand: #aa3bff;
   --brand-2: #6d28d9;
   --ink: #18162a;
@@ -358,9 +370,10 @@ onMounted(async () => {
   --line: #ececf3;
   --page: #f4f3f9;
   color-scheme: light;
-  display: grid;
-  grid-template-columns: 256px 1fr;
   min-height: 100vh;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--page);
   color: var(--ink);
 }
@@ -372,177 +385,7 @@ svg path {
   stroke-linejoin: round;
 }
 
-/* ---------- Sidebar ---------- */
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  padding: 18px 14px;
-  background: #fff;
-  border-right: 1px solid var(--line);
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 8px 18px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--line);
-}
-.logo-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--brand), var(--brand-2));
-  color: #fff;
-  font-weight: 800;
-  font-size: 21px;
-  box-shadow: 0 8px 18px -8px rgba(109, 40, 217, 0.7);
-}
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-.brand-name {
-  font-weight: 800;
-  font-size: 17px;
-}
-.brand-sub {
-  font-size: 11.5px;
-  color: var(--muted);
-}
-.nav {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.nav-section {
-  margin: 14px 12px 6px;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
-  color: #b6b4c4;
-}
-.nav-parent {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: #45435a;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.15s, color 0.15s;
-}
-.nav-parent:hover {
-  background: #f6f3fc;
-  color: var(--ink);
-}
-.nav-parent.open {
-  color: var(--brand-2);
-}
-.nav-ic {
-  width: 19px;
-  height: 19px;
-  flex: none;
-}
-.nav-title {
-  flex: 1;
-  text-align: left;
-}
-.chev {
-  width: 16px;
-  height: 16px;
-  color: #b6b4c4;
-  transition: transform 0.22s ease;
-}
-.nav-parent.open .chev {
-  transform: rotate(90deg);
-}
-.submenu {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s ease;
-}
-.submenu.open {
-  grid-template-rows: 1fr;
-}
-.submenu-inner {
-  overflow: hidden;
-}
-.nav-child {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 8px 12px 8px 26px;
-  margin: 1px 0;
-  border-radius: 9px;
-  color: #6a6880;
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-}
-.nav-child:hover {
-  background: #f6f3fc;
-  color: var(--ink);
-}
-.nav-child.active {
-  background: linear-gradient(135deg, rgba(170, 59, 255, 0.13), rgba(109, 40, 217, 0.1));
-  color: var(--brand-2);
-  font-weight: 700;
-}
-.bullet {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex: none;
-  opacity: 0.5;
-}
-.nav-child.active .bullet {
-  opacity: 1;
-}
-.side-logout {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-top: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  color: #45435a;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.side-logout:hover {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-
 /* ---------- Topbar ---------- */
-.main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
 .topbar {
   display: flex;
   align-items: center;
@@ -1057,6 +900,50 @@ svg path {
 }
 
 /* Responsive */
+/* Üye ara modalı */
+.search-card {
+  width: 520px;
+  max-width: 94vw;
+  border-radius: 16px;
+}
+.search-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+}
+.search-field {
+  flex: 1;
+}
+.search-results {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+.search-hint {
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.res-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(170, 59, 255, 0.12);
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .stats {
     grid-template-columns: repeat(2, 1fr);
@@ -1067,12 +954,6 @@ svg path {
   }
 }
 @media (max-width: 860px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .sidebar {
-    display: none;
-  }
   .searchbox,
   .who-meta {
     display: none;
