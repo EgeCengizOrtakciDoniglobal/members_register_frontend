@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { login, tokenStore, ApiError } from '../api'
+import { useRouter } from 'vue-router'
+import { login, tokenStore, userStore, lastLoginStore, ApiError } from '../api'
+
+const router = useRouter()
 
 const mail = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
-const success = ref(false)
-const loggedUser = ref('')
 
 const canSubmit = computed(
   () => mail.value.trim().length > 0 && password.value.length > 0 && !loading.value,
@@ -21,8 +22,9 @@ async function onSubmit() {
   try {
     const res = await login(mail.value.trim(), password.value)
     tokenStore.set(res.token)
-    loggedUser.value = res.user.name
-    success.value = true
+    userStore.set(res.user)
+    lastLoginStore.markLogin()
+    router.push({ name: 'dashboard' })
   } catch (e) {
     if (e instanceof ApiError) {
       if (e.errors) {
@@ -38,13 +40,6 @@ async function onSubmit() {
   } finally {
     loading.value = false
   }
-}
-
-function logout() {
-  tokenStore.clear()
-  success.value = false
-  mail.value = ''
-  password.value = ''
 }
 </script>
 
@@ -63,7 +58,6 @@ function logout() {
 
     <!-- Ortadaki cam kart -->
     <div class="card">
-      <template v-if="!success">
         <div class="logo">
           <span class="logo-mark">M</span>
         </div>
@@ -148,17 +142,6 @@ function logout() {
         <p class="foot">
           Hesabınız yok mu? <a class="link" href="#" @click.prevent>Yöneticinize başvurun</a>
         </p>
-      </template>
-
-      <!-- Başarı durumu (dashboard henüz yok) -->
-      <template v-else>
-        <div class="success">
-          <div class="check">✓</div>
-          <h1>Giriş başarılı</h1>
-          <p>Hoş geldin, <strong>{{ loggedUser }}</strong>. Dashboard yakında burada olacak.</p>
-          <button class="submit ghost" @click="logout">Çıkış yap</button>
-        </div>
-      </template>
     </div>
   </div>
 </template>

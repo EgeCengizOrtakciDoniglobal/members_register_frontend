@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import LoginScreen from './components/LoginScreen.vue'
+import { RouterView } from 'vue-router'
 </script>
 
 <template>
-  <LoginScreen />
+  <RouterView />
 </template>
