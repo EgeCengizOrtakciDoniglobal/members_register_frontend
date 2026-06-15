@@ -1,64 +1,54 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar, type QTableColumn } from 'quasar'
 import {
-  getMembers,
-  deleteMember,
-  isAdmin,
+  getUsers,
+  deleteUser,
+  userStore,
   logout as doLogout,
   ApiError,
-  type Member,
+  type User,
 } from '../api'
-import MemberFormDialog from './MemberFormDialog.vue'
+import UserFormDialog from './UserFormDialog.vue'
 
 const router = useRouter()
 const $q = useQuasar()
 
-// Üye silme yalnızca admin'e açık (backend de non-admin'e 403 döner).
-const admin = isAdmin()
-
-const rows = ref<Member[]>([])
+const rows = ref<User[]>([])
 const loading = ref(false)
 const filter = ref('')
 
-const statusFilter = ref<'all' | Member['status']>('all')
-const statusFilterOptions = [
-  { label: 'Tümü', value: 'all' },
-  { label: 'Aktif', value: 'active' },
-  { label: 'Pasif', value: 'inactive' },
-  { label: 'Beklemede', value: 'pending' },
-]
-const displayedRows = computed(() =>
-  statusFilter.value === 'all' ? rows.value : rows.value.filter((m) => m.status === statusFilter.value),
-)
+// Kendi hesabını silmeyi engellemek için giriş yapan kullanıcının id'si.
+const myId = userStore.get()?.id ?? -1
 
-const columns: QTableColumn<Member>[] = [
+const columns: QTableColumn<User>[] = [
   { name: 'name', label: 'Ad', field: 'name', align: 'left', sortable: true },
-  { name: 'lastname', label: 'Soyad', field: 'lastname', align: 'left', sortable: true },
   { name: 'mail', label: 'E-posta', field: 'mail', align: 'left', sortable: true },
-  { name: 'tckn', label: 'TCKN', field: 'tckn', align: 'left' },
-  { name: 'lisanceno', label: 'Lisans No', field: 'lisanceno', align: 'left' },
+  { name: 'role', label: 'Rol', field: 'role', align: 'center', sortable: true },
   { name: 'status', label: 'Durum', field: 'status', align: 'center', sortable: true },
   { name: 'create_date', label: 'Tarih', field: 'create_date', align: 'left', sortable: true,
     format: (v: string) => new Date(v.replace(' ', 'T')).toLocaleDateString('tr-TR') },
   { name: 'actions', label: 'İşlemler', field: 'id', align: 'right' },
 ]
 
-function statusColor(s: Member['status']) {
+function statusColor(s: User['status']) {
   return s === 'active' ? 'positive' : s === 'inactive' ? 'negative' : 'warning'
 }
-function statusLabel(s: Member['status']) {
+function statusLabel(s: User['status']) {
   return s === 'active' ? 'Aktif' : s === 'inactive' ? 'Pasif' : 'Beklemede'
+}
+function roleLabel(r: User['role']) {
+  return r === 'admin' ? 'Yönetici' : 'Kullanıcı'
 }
 
 /* ---------- Veri yükleme ---------- */
 async function load() {
   loading.value = true
   try {
-    rows.value = await getMembers()
+    rows.value = await getUsers()
   } catch (e) {
-    handleError(e, 'Üyeler yüklenemedi.')
+    handleError(e, 'Kullanıcılar yüklenemedi.')
   } finally {
     loading.value = false
   }
@@ -78,32 +68,32 @@ function handleError(e: unknown, fallback: string) {
   $q.notify({ type: 'negative', message: msg ?? fallback, position: 'top' })
 }
 
-/* ---------- Form (ekle / düzenle) — MemberFormDialog bileşeniyle ---------- */
+/* ---------- Form (ekle / düzenle) ---------- */
 const dialog = ref(false)
-const editing = ref<Member | null>(null)
+const editing = ref<User | null>(null)
 
 function openCreate() {
   editing.value = null
   dialog.value = true
 }
 
-function openEdit(m: Member) {
-  editing.value = m
+function openEdit(u: User) {
+  editing.value = u
   dialog.value = true
 }
 
 /* ---------- Silme ---------- */
-function confirmDelete(m: Member) {
+function confirmDelete(u: User) {
   $q.dialog({
-    title: 'Üyeyi sil',
-    message: `${m.name} ${m.lastname} adlı üyeyi silmek istediğinize emin misiniz?`,
+    title: 'Kullanıcıyı sil',
+    message: `${u.name} adlı kullanıcıyı silmek istediğinize emin misiniz?`,
     cancel: { label: 'Vazgeç', flat: true, color: 'grey-8' },
     ok: { label: 'Sil', color: 'negative', unelevated: true },
     persistent: true,
   }).onOk(async () => {
     try {
-      await deleteMember(m.id)
-      $q.notify({ type: 'positive', message: 'Üye silindi.', position: 'top' })
+      await deleteUser(u.id)
+      $q.notify({ type: 'positive', message: 'Kullanıcı silindi.', position: 'top' })
       await load()
     } catch (e) {
       handleError(e, 'Silinemedi.')
@@ -121,17 +111,17 @@ onMounted(load)
       <div class="bar-left">
         <q-btn flat round dense icon="arrow_back" color="grey-8" @click="router.push({ name: 'dashboard' })" />
         <div>
-          <h1>Üye Yönetimi</h1>
-          <p>Üyeleri görüntüle, ekle, düzenle ve sil</p>
+          <h1>Kullanıcı Yönetimi</h1>
+          <p>Panel kullanıcılarını görüntüle, ekle, düzenle ve yetki ata</p>
         </div>
       </div>
-      <q-btn unelevated color="primary" icon="add" label="Yeni Üye" no-caps @click="openCreate" />
+      <q-btn unelevated color="primary" icon="add" label="Yeni Kullanıcı" no-caps @click="openCreate" />
     </header>
 
     <!-- Tablo -->
     <div class="wrap">
       <q-table
-        :rows="displayedRows"
+        :rows="rows"
         :columns="columns"
         row-key="id"
         :loading="loading"
@@ -139,23 +129,10 @@ onMounted(load)
         flat
         bordered
         :rows-per-page-options="[10, 20, 50, 0]"
-        class="members-table"
+        class="users-table"
       >
         <template #top-left>
-          <div class="top-left">
-            <div class="t-title">Tüm Üyeler <span class="count">{{ displayedRows.length }}</span></div>
-            <q-btn-toggle
-              v-model="statusFilter"
-              :options="statusFilterOptions"
-              no-caps
-              unelevated
-              dense
-              toggle-color="primary"
-              color="white"
-              text-color="grey-8"
-              class="status-toggle"
-            />
-          </div>
+          <div class="t-title">Tüm Kullanıcılar <span class="count">{{ rows.length }}</span></div>
         </template>
         <template #top-right>
           <q-input v-model="filter" dense outlined debounce="200" placeholder="Ara…">
@@ -168,7 +145,14 @@ onMounted(load)
             <div class="cell-name">
               <span class="avatar">{{ props.row.name.charAt(0).toUpperCase() }}</span>
               {{ props.row.name }}
+              <q-badge v-if="props.row.id === myId" color="primary" label="Siz" class="me-badge" />
             </div>
+          </q-td>
+        </template>
+
+        <template #body-cell-role="props">
+          <q-td :props="props" class="text-center">
+            <q-badge :color="props.row.role === 'admin' ? 'deep-purple-5' : 'blue-grey-4'" :label="roleLabel(props.row.role)" rounded class="status-badge" />
           </q-td>
         </template>
 
@@ -183,23 +167,27 @@ onMounted(load)
             <q-btn flat round dense icon="edit" color="primary" size="sm" @click="openEdit(props.row)">
               <q-tooltip>Düzenle</q-tooltip>
             </q-btn>
-            <q-btn v-if="admin" flat round dense icon="delete" color="negative" size="sm" @click="confirmDelete(props.row)">
-              <q-tooltip>Sil</q-tooltip>
+            <q-btn
+              flat round dense icon="delete" color="negative" size="sm"
+              :disable="props.row.id === myId"
+              @click="confirmDelete(props.row)"
+            >
+              <q-tooltip>{{ props.row.id === myId ? 'Kendinizi silemezsiniz' : 'Sil' }}</q-tooltip>
             </q-btn>
           </q-td>
         </template>
 
         <template #no-data>
           <div class="empty">
-            <q-icon name="group_off" size="42px" color="grey-5" />
-            <span>Henüz üye yok. "Yeni Üye" ile ekleyebilirsin.</span>
+            <q-icon name="person_off" size="42px" color="grey-5" />
+            <span>Henüz kullanıcı yok. "Yeni Kullanıcı" ile ekleyebilirsin.</span>
           </div>
         </template>
       </q-table>
     </div>
 
     <!-- Ekle / Düzenle dialog -->
-    <MemberFormDialog v-model="dialog" :member="editing" @saved="load" />
+    <UserFormDialog v-model="dialog" :user="editing" @saved="load" />
   </div>
 </template>
 
@@ -240,11 +228,11 @@ onMounted(load)
   max-width: 1200px;
   margin: 0 auto;
 }
-.members-table {
+.users-table {
   background: #fff;
   border-radius: 16px;
 }
-.members-table :deep(thead th) {
+.users-table :deep(thead th) {
   font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
@@ -252,7 +240,7 @@ onMounted(load)
   color: #7b7889;
   background: #faf9fd;
 }
-.members-table :deep(tbody td) {
+.users-table :deep(tbody td) {
   font-size: 13.5px;
 }
 .t-title {
@@ -270,33 +258,15 @@ onMounted(load)
   font-size: 12.5px;
   font-weight: 700;
 }
-.top-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.status-toggle {
-  border: 1px solid #ececf3;
-  border-radius: 9px;
-  overflow: hidden;
-}
-/* Segment butonları: net aralık, sabit yükseklik, üst üste binme yok */
-.status-toggle :deep(.q-btn) {
-  min-height: 30px;
-  padding: 0 14px;
-  font-size: 12.5px;
-  font-weight: 600;
-  border-radius: 0;
-}
-.status-toggle :deep(.q-btn + .q-btn) {
-  border-left: 1px solid #ececf3;
-}
 .cell-name {
   display: flex;
   align-items: center;
   gap: 10px;
   font-weight: 600;
+}
+.me-badge {
+  font-size: 10px;
+  font-weight: 700;
 }
 .avatar {
   width: 30px;

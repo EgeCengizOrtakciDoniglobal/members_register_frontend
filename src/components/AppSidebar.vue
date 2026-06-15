@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { logout as doLogout } from '../api'
+import { logout as doLogout, isAdmin, userStore } from '../api'
+
+// Giriş yapan kullanıcı — adı ve rolü sidebar'da herkese gösterilir.
+const me = userStore.get()
+const roleLabel = computed(() => (me?.role === 'admin' ? 'Yönetici' : 'Kullanıcı'))
 
 const route = useRoute()
 const router = useRouter()
@@ -18,7 +22,8 @@ const ICONS: Record<string, string> = {
 interface NavChild { title: string; route?: string; query?: Record<string, string> }
 interface NavItem { id: string; title: string; icon: string; route?: string; children?: NavChild[] }
 
-const menu: { section: string; items: NavItem[] }[] = [
+// Kullanıcılar menüsü yalnızca admin rolüne gösterilir (route'ta da admin guard var).
+const menu = computed<{ section: string; items: NavItem[] }[]>(() => [
   {
     section: 'ANA MENÜ',
     items: [
@@ -29,14 +34,17 @@ const menu: { section: string; items: NavItem[] }[] = [
   {
     section: 'YÖNETİM',
     items: [
+      ...(isAdmin()
+        ? [{ id: 'users', title: 'Kullanıcılar', icon: 'userplus', children: [{ title: 'Tüm Kullanıcılar', route: 'users' }] }]
+        : []),
       { id: 'reports', title: 'Raporlar', icon: 'chart', children: [{ title: 'Aylık Rapor', route: 'reports' }, { title: 'Durum Raporu', route: 'reports', query: { tab: 'status' } }] },
       { id: 'settings', title: 'Ayarlar', icon: 'settings', children: [{ title: 'WordPress Bağlantı', route: 'wp-connection' }] },
     ],
   },
-]
+])
 
 // Tüm gruplar varsayılan olarak açık gelsin.
-const open = reactive<Record<string, boolean>>({ dash: true, members: true, reports: true, settings: true })
+const open = reactive<Record<string, boolean>>({ dash: true, members: true, users: true, reports: true, settings: true })
 function toggle(id: string) {
   open[id] = !open[id]
 }
@@ -97,6 +105,14 @@ function logout() {
         </template>
       </template>
     </nav>
+
+    <div class="side-user">
+      <span class="su-avatar">{{ (me?.name ?? 'U').charAt(0).toUpperCase() }}</span>
+      <div class="su-meta">
+        <span class="su-name">{{ me?.name ?? 'Kullanıcı' }}</span>
+        <span class="su-role" :class="me?.role === 'admin' ? 'r-admin' : 'r-user'">{{ roleLabel }}</span>
+      </div>
+    </div>
 
     <button class="side-logout" @click="logout">
       <svg class="nav-ic" viewBox="0 0 24 24"><path :d="ICONS.logout" /></svg>
@@ -267,6 +283,54 @@ svg path {
 .nav-child.active .bullet {
   opacity: 1;
 }
+.side-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #faf9fd;
+}
+.su-avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+.su-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+.su-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.su-role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.su-role.r-admin {
+  color: #6d28d9;
+}
+.su-role.r-user {
+  color: #7b7889;
+}
+
 .side-logout {
   display: flex;
   align-items: center;

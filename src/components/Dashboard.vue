@@ -316,7 +316,7 @@ onMounted(loadMembers)
       </main>
 
     <!-- Üye ara modalı -->
-    <q-dialog v-model="searchDialog">
+    <q-dialog v-model="searchDialog" no-refocus>
       <q-card class="search-card">
         <q-card-section class="search-head">
           <div class="text-h6">Üye Ara</div>

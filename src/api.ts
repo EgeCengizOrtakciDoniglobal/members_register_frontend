@@ -1,8 +1,10 @@
 // Basit API yardımcısı — backend Laravel REST API ile konuşur.
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api'
 
+export type Role = 'admin' | 'user'
+
 export interface LoginResponse {
-  user: { id: number; name: string; mail: string; status: string }
+  user: { id: number; name: string; mail: string; status: string; role: Role }
   token: string
   token_type: string
 }
@@ -89,6 +91,11 @@ export function isAuthenticated(): boolean {
   return !!tokenStore.get()
 }
 
+/** Giriş yapan kullanıcının rolü 'admin' mi? (localStorage'daki user'dan okur.) */
+export function isAdmin(): boolean {
+  return userStore.get()?.role === 'admin'
+}
+
 export function logout() {
   tokenStore.clear()
   userStore.clear()
@@ -163,6 +170,63 @@ export function updateMember(id: number, input: MemberInput): Promise<Member> {
 /** Üyeyi siler (DELETE /members/{id}). */
 export function deleteMember(id: number): Promise<{ message: string }> {
   return authJson(`/members/${id}`, 'DELETE') as Promise<{ message: string }>
+}
+
+/* ---------- Kullanıcı yönetimi (yalnızca admin) ---------- */
+
+export interface User {
+  id: number
+  name: string
+  mail: string
+  status: 'active' | 'inactive' | 'pending'
+  role: Role
+  create_date: string
+}
+
+export interface UserInput {
+  name: string
+  mail: string
+  /** Yeni kayıtta zorunlu; düzenlemede boş bırakılırsa değiştirilmez. */
+  password?: string
+  status: 'active' | 'inactive' | 'pending'
+  role: Role
+}
+
+/** Korumalı kullanıcı listesini token ile çeker (admin uçları). */
+export async function getUsers(): Promise<User[]> {
+  const res = await fetch(`${API_URL}/users`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${tokenStore.get() ?? ''}`,
+    },
+  })
+
+  if (res.status === 401) {
+    throw new ApiError('Oturum süresi doldu.', 401)
+  }
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new ApiError(data?.message ?? 'Kullanıcılar alınamadı.', res.status)
+  }
+
+  // Laravel JsonResource::collection → { data: [...] }
+  return (data.data ?? data) as User[]
+}
+
+/** Yeni kullanıcı ekler (POST /users). */
+export function createUser(input: UserInput): Promise<User> {
+  return authJson('/users', 'POST', input) as Promise<User>
+}
+
+/** Kullanıcıyı günceller (PUT /users/{id}). */
+export function updateUser(id: number, input: Partial<UserInput>): Promise<User> {
+  return authJson(`/users/${id}`, 'PUT', input) as Promise<User>
+}
+
+/** Kullanıcıyı siler (DELETE /users/{id}). */
+export function deleteUser(id: number): Promise<{ message: string }> {
+  return authJson(`/users/${id}`, 'DELETE') as Promise<{ message: string }>
 }
 
 /* ---------- WordPress entegrasyonu ---------- */
