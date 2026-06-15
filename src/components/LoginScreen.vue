@@ -57,6 +57,10 @@ function logout() {
       <span class="orb orb-3" />
     </div>
 
+    <!-- Kartın arkasından bakan karakterler -->
+    <img src="/person1.png" alt="" class="person person-left" />
+    <img src="/person2.png" alt="" class="person person-right" />
+
     <!-- Ortadaki cam kart -->
     <div class="card">
       <template v-if="!success">
@@ -213,10 +217,29 @@ function logout() {
   opacity: 0.4;
 }
 
+/* ---------- Arkadan bakan karakterler ---------- */
+.person {
+  position: absolute;
+  top: 57%;
+  width: 168px;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 20px 26px rgba(80, 40, 160, 0.22));
+}
+.person-left {
+  left: calc(50% - 335px);
+  transform: translateY(-50%) rotate(-9deg);
+}
+.person-right {
+  right: calc(50% - 335px);
+  transform: translateY(-50%) scaleX(-1) rotate(-9deg);
+}
+
 /* ---------- Cam kart ---------- */
 .card {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
   max-width: 410px;
   padding: 40px 36px 32px;
@@ -428,5 +451,12 @@ function logout() {
   margin: 0 0 12px;
   color: var(--muted);
   font-size: 14.5px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .person {
+    display: none;
+  }
 }
 </style>
