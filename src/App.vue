@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import LoginScreen from './components/LoginScreen.vue'
 </script>
 
 <template>
-  <HelloWorld />
+  <LoginScreen />
 </template>
